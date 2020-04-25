@@ -1,5 +1,8 @@
 #! /usr/bin/env bash
 
+# No, not "decimal", it's "declaration". Find type & function declarations
+# in C and Lua code without actually parsing either.
+
 # These search strings are nowhere near perfect,
 # but good enough for the code I work with
 search_strings=(
