@@ -1,0 +1,148 @@
+#! /usr/bin/env bash
+
+# This is a gloriously terrible hack that only works because Linux is awesome.
+# I hate drawing diagrams on a computer, so I want to take images straight
+# from a webcam and insert them in my favorite document editor (LyX).
+# Doing this involves some nonsense with temporary files, filesystem events,
+# GIMP, Bash coprocesses, fake keypresses, and the X Clipboard.
+
+set -e
+
+# Come up with a name for our image.
+mkdir -p ~/.local/share/instantpicture
+imagename=~/.local/share/instantpicture/$(uuidgen).png
+
+# Take the picture.
+fswebcam --png -1 --resolution 1600x1200 $imagename
+
+# Open the editor.
+# We're using GIMP specifically because it is interactive
+# and keyboard-accessible.
+coproc gimp -d -f -n -s -b - $imagename
+
+# Wait for the editor to be ready.
+# Ideally, this would check that GIMP is focused and
+# ready for input instead of just waiting, but I'm lazy.
+sleep 1
+
+# Pretend to be me at the keyboard, starting a crop command in GIMP.
+# No, GIMP's scripting doesn't let a script pretend to be the user, so
+# I have to do it this way.
+xdotool key shift+c
+
+# Wait for the file to change, which is how we know that we've saved it.
+inotifywait -e modify $imagename
+
+# Wait a little longer so we don't kill the editor while it's writing the file.
+# This is the most dangerous part, since we might end up with an incomplete
+# file. We can just wait longer in the future if that's a problem.
+sleep 2
+
+# Tell the editor to close what we're assuming is the only display.
+# This will avoid a file-recovery prompt the next time it is opened.
+echo "(gimp-display-delete 1)" >&"${COPROC[1]}"
+
+# Wait a hot second for it to do that.
+sleep 1
+
+# Kill the editor.
+kill $COPROC_PID
+
+# Wait for it to die.
+wait $COPROC_PID || true
+
+# Create a clipboard selection for LyX.
+# I'm using xclip instead of xsel because I need to set the MIME type.
+xclip -selection clipboard -t application/x-lyx <<EOF
+#This sort of document is what LyX puts on the clipboard if you cut&paste.
+\lyxformat 544
+\begin_document
+\begin_header
+\save_transient_properties true
+\origin unavailable
+\textclass article
+\use_default_options true
+\maintain_unincluded_children false
+\language english
+\language_package default
+\inputencoding auto
+\fontencoding global
+\font_roman "default" "default"
+\font_sans "default" "default"
+\font_typewriter "default" "default"
+\font_math "auto" "auto"
+\font_default_family default
+\use_non_tex_fonts false
+\font_sc false
+\font_osf false
+\font_sf_scale 100 100
+\font_tt_scale 100 100
+\use_microtype false
+\use_dash_ligatures true
+\graphics default
+\default_output_format default
+\output_sync 0
+\bibtex_command default
+\index_command default
+\paperfontsize default
+\use_hyperref false
+\papersize default
+\use_geometry false
+\use_package amsmath 1
+\use_package amssymb 1
+\use_package cancel 1
+\use_package esint 1
+\use_package mathdots 1
+\use_package mathtools 1
+\use_package mhchem 1
+\use_package stackrel 1
+\use_package stmaryrd 1
+\use_package undertilde 1
+\cite_engine basic
+\cite_engine_type default
+\use_bibtopic false
+\use_indices false
+\paperorientation portrait
+\suppress_date false
+\justification true
+\use_refstyle 1
+\use_minted 0
+\index Index
+\shortcut idx
+\color #008000
+\end_index
+\secnumdepth 3
+\tocdepth 3
+\paragraph_separation indent
+\paragraph_indentation default
+\is_math_indent 0
+\math_numbering_side default
+\quotes_style english
+\dynamic_quotes 0
+\papercolumns 1
+\papersides 1
+\paperpagestyle default
+\tracking_changes false
+\output_changes false
+\html_math_output 0
+\html_css_as_file 0
+\html_be_strict false
+\end_header
+
+\begin_body
+
+\begin_layout Standard
+\begin_inset Graphics
+        filename $imagename
+
+\end_inset
+
+
+\end_layout
+
+\end_body
+\end_document
+EOF
+
+# Pretend to be me again. Paste.
+xdotool key ctrl+v

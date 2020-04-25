@@ -1,0 +1,29 @@
+#! /usr/bin/env bash
+
+# These search strings are nowhere near perfect,
+# but good enough for the code I work with
+search_strings=(
+	# C typedef
+	'^typedef\W*.*\W*'"$1"'\W*;$'
+	# C function pointer typedef
+	'^typedef\W.*(\s*\*'"$1"
+	# C macro
+	'#define\s\+'"$1"
+	# C struct/union/enum
+	'^\(struct\|union\|enum\)\s\+'"$1"
+	# C function
+	'^\S[_*[:alnum:][:space:]]*[*[:space:]]'"$1"
+	# lua function
+	'function\s*'"$1"
+)
+
+# Separate $search_strings with newlines (required by grep),
+# use grep to find all occurrences of search string, report line numbers,
+# use sed to rearrange into the format we want,
+# and separate the formatted result with newlines.
+printf "%s\n" \
+$(
+	printf "%s\n" ${search_strings[@]} \
+	| grep . --line-number --recursive --file=- \
+	| sed 's/^\(.*\):\(.*\):.*$/+\2 \1/g' \
+)
