@@ -1,0 +1,14 @@
+#! /usr/bin/env bash
+
+set -e
+
+folder_name="$HOME/.local/share/editclipboard"
+document_name="$folder_name/current-document"
+
+mkdir -p "$folder_name"
+
+mime_type=$(xclip -selection clipboard -o -t TARGETS | grep -v TARGETS - | head -1)
+xclip -selection clipboard -o -t $mime_type > "$document_name"
+nano -R -t "$document_name"
+xclip -selection clipboard -i -t $mime_type < "$document_name"
+rm "$document_name"
